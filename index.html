@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matematicss del amor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #05040a;
+      --text: #f5e6ff;
+      --neon: #ff2fb3;
+      --neon-soft: #ff66cc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 20% -10%, #0f0b1a, var(--bg));
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh;
+    }
+    #mensaje {
+      font-size: 24px;
+      color: var(--neon);
+      text-shadow: 0 0 12px var(--neon-soft);
+      text-align: center;
+      animation: fadeIn 2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    #contenido {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    canvas { width: 100%; height: 60vh; display: block; }
+    .formula {
+      margin: 16px; font-size: 18px; text-align: center;
+      color: var(--neon); text-shadow: 0 0 8px var(--neon-soft);
+    }
+  </style>
+</head>
+<body>
+  <div id="mensaje">Las funciones no solo son estres… también son amor cuando tu eres mi variable independiente</div>
+  <div id="contenido">
+    <canvas id="plot"></canvas>
+    <div class="formula">f(x) = x^(2/3) + √(3 − x²) · sin(16πx)</div>
+  </div>
+  <script>
+    setTimeout(() => {
+      document.getElementById('mensaje').style.display = 'none';
+      document.getElementById('contenido').style.display = 'flex';
+      iniciarGrafica();
+    }, 3000);
+
+    function createHiDPICanvas(canvas) {
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      return ctx;
+    }
+    function f(x) {
+      const rad = 3 - x * x;
+      if (rad < 0) return NaN;
+      const term1 = Math.pow(Math.abs(x), 2/3);
+      const term2 = Math.sqrt(rad) * Math.sin(16 * Math.PI * x);
+      return term1 + term2;
+    }
+    function sampleFunction(xmin, xmax, n) {
+      const xs = new Float64Array(n);
+      const ys = new Float64Array(n);
+      const dx = (xmax - xmin) / (n - 1);
+      for (let i = 0; i < n; i++) {
+        const x = xmin + i * dx;
+        xs[i] = x;
+        ys[i] = f(x);
+      }
+      return { xs, ys };
+    }
+    function makeScales(xs, ys) {
+      const xmin = Math.min(...xs);
+      const xmax = Math.max(...xs);
+      let ymin = Infinity, ymax = -Infinity;
+      for (let y of ys) {
+        if (!Number.isFinite(y)) continue;
+        if (y < ymin) ymin = y;
+        if (y > ymax) ymax = y;
+      }
+      const xpad = (xmax - xmin) * 0.08;
+      const ypad = (ymax - ymin) * 0.1;
+      return { xRange: [xmin - xpad, xmax + xpad], yRange: [ymin - ypad, ymax + ypad] };
+    }
+    function createTransform(canvas, xRange, yRange) {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      const [xmin, xmax] = xRange;
+      const [ymin, ymax] = yRange;
+      const sx = w / (xmax - xmin);
+      const sy = h / (ymax - ymin);
+      return {
+        toCanvas: (x, y) => [(x - xmin) * sx, h - (y - ymin) * sy],
+        dims: { w, h }
+      };
+    }
+    function drawGrid(ctx, canvas, transform) {
+      const { w, h } = transform.dims;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#2a1b3d';
+      for (let i = 1; i < 10; i++) {
+        const x = (w / 10) * i;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let j = 1; j < 8; j++) {
+        const y = (h / 8) * j;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+    }
+    function animateDraw(ctx, xs, ys, transform) {
+      let i = 0;
+      const n = xs.length;
+      function frame() {
+        const iNext = Math.min(n, i + 10); // lento: 10 puntos por frame
+        ctx.beginPath();
+        let started = false;
+        for (let k = i; k < iNext; k++) {
+          const y = ys[k];
+          if (!Number.isFinite(y)) { started = false; continue; }
+          const [cx, cy] = transform.toCanvas(xs[k], y);
+          if (!started) { ctx.moveTo(cx, cy); started = true; }
+          else { ctx.lineTo(cx, cy); }
+        }
+        ctx.strokeStyle = '#ff2fb3';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#ff2fb3';
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+        i = iNext;
+        if (i < n) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+    function iniciarGrafica() {
+      const canvas = document.getElementById('plot');
+      const ctx = createHiDPICanvas(canvas);
+      const { xs, ys } = sampleFunction(-Math.sqrt(3), Math.sqrt(3), 3000);
+      const scales = makeScales(xs, ys);
+      const transform = createTransform(canvas, scales.xRange, scales.yRange);
+      drawGrid(ctx, canvas, transform);
+      animateDraw(ctx, xs, ys, transform);
+      window.addEventListener('resize', () => {
+        createHiDPICanvas(canvas);
+        const { xs, ys } = sampleFunction(-Math.sqrt(3), Math.sqrt(3), 3000);
+        const scales = makeScales(xs, ys);
+        const transform = createTransform(canvas, scales.xRange, scales.yRange);
+        drawGrid(ctx, canvas, transform);
+        animateDraw(ctx, xs, ys, transform);
+      });
+    }
+  </script>
+</body>
+</html>
